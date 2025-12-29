@@ -5,21 +5,21 @@ import { motion, AnimatePresence } from 'framer-motion';
 const translations = {
   ar: {
     title: "زابط", slogan: "دليلك الشامل للبث المباشر", placeholder: "ابحث عن فيلم أو مسلسل...", 
-    sections: { local: "أكثر شيوعاً في قطر", global: "التوجهات العالمية" },
+    sections: { local: "أكثر شيوعاً في قطر", global: "التوجهات العالمية", search: "نتائج البحث" },
     categories: { all: "الكل", movie: "أفلام", tv: "مسلسلات" },
-    available: "متوفر على :", close: "إغلاق",
+    available: "متوفر على :", close: "إغلاق", more: "عرض المزيد",
   },
   fr: {
     title: "ZAPIT", slogan: "Votre guide ultime du streaming", placeholder: "Chercher un film, une série...", 
-    sections: { local: "Top au Qatar", global: "Tendances Mondiales" },
+    sections: { local: "Top au Qatar", global: "Tendances Mondiales", search: "Résultats de recherche" },
     categories: { all: "Tout", movie: "Films", tv: "Séries" },
-    available: "Disponible sur :", close: "Fermer",
+    available: "Disponible sur :", close: "Fermer", more: "Voir plus",
   },
   en: {
     title: "ZAPIT", slogan: "Your ultimate streaming guide", placeholder: "Search movies, shows...", 
-    sections: { local: "Trending in Qatar", global: "Global Trends" },
+    sections: { local: "Trending in Qatar", global: "Global Trends", search: "Search Results" },
     categories: { all: "All", movie: "Movies", tv: "TV Shows" },
-    available: "Watch on:", close: "Close",
+    available: "Watch on:", close: "Close", more: "See more",
   }
 };
 
@@ -30,6 +30,7 @@ export default function Home() {
   const [searchContent, setSearchContent] = useState([]);
   const [query, setQuery] = useState('');
   const [type, setType] = useState('movie'); 
+  const [page, setPage] = useState(1);
   const [selectedItem, setSelectedItem] = useState(null);
   const [providers, setProviders] = useState(null);
 
@@ -55,18 +56,15 @@ export default function Home() {
     }
   }, [query]);
 
-  // Section 1 : Top au Qatar
   const fetchLocalData = async () => {
     const tmdbLang = lang === 'ar' ? 'ar-SA' : lang === 'fr' ? 'fr-FR' : 'en-US';
     try {
-      // On utilise watch_region=QA pour cibler le Qatar
       const res = await fetch(`https://api.themoviedb.org/3/discover/${type}?api_key=${API_KEY}&language=${tmdbLang}&sort_by=popularity.desc&watch_region=QA&with_watch_monetization_types=flatrate`);
       const data = await res.json();
       setLocalContent(data.results?.slice(0, 6) || []);
     } catch (e) { console.error(e); }
   };
 
-  // Section 2 : Tendances Mondiales
   const fetchGlobalData = async () => {
     const tmdbLang = lang === 'ar' ? 'ar-SA' : lang === 'fr' ? 'fr-FR' : 'en-US';
     try {
@@ -76,12 +74,21 @@ export default function Home() {
     } catch (e) { console.error(e); }
   };
 
-  const fetchSearch = async (q) => {
+  const fetchSearch = async (q, isMore = false) => {
     const tmdbLang = lang === 'ar' ? 'ar-SA' : 'fr-FR';
+    const nextPage = isMore ? page + 1 : 1;
     try {
-      const res = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=${API_KEY}&language=${tmdbLang}&query=${q}`);
+      const res = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=${API_KEY}&language=${tmdbLang}&query=${q}&page=${nextPage}`);
       const data = await res.json();
-      setSearchContent(data.results?.filter(i => i.poster_path) || []);
+      const newItems = data.results?.filter(i => i.poster_path) || [];
+      
+      if (isMore) {
+        setSearchContent(prev => [...prev, ...newItems]);
+        setPage(nextPage);
+      } else {
+        setSearchContent(newItems);
+        setPage(1);
+      }
     } catch (e) { console.error(e); }
   };
 
@@ -110,8 +117,8 @@ export default function Home() {
         {title}
       </h3>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
-        {items.map((m) => (
-          <motion.div key={m.id} whileHover={{ y: -8 }} onClick={() => {setSelectedItem(m); fetchProviders(m.id, m.media_type || type)}} className="group relative aspect-[2/3] rounded-[2rem] overflow-hidden bg-white/5 cursor-pointer border border-white/5">
+        {items.map((m, idx) => (
+          <motion.div key={`${m.id}-${idx}`} whileHover={{ y: -8 }} onClick={() => {setSelectedItem(m); fetchProviders(m.id, m.media_type || type)}} className="group relative aspect-[2/3] rounded-[2rem] overflow-hidden bg-white/5 cursor-pointer border border-white/5">
             <img src={`https://image.tmdb.org/t/p/w500${m.poster_path}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={m.title || m.name} />
           </motion.div>
         ))}
@@ -123,12 +130,14 @@ export default function Home() {
     <main className="min-h-screen bg-[#050505] text-white p-6 md:p-12" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
       <div className="max-w-7xl mx-auto relative">
         
+        {/* Sélecteur de langue */}
         <div className={`absolute top-0 ${lang === 'ar' ? 'left-0' : 'right-0'} flex gap-2 z-[110]`}>
           {['ar', 'fr', 'en'].map(l => (
             <button key={l} onClick={() => setLang(l)} className={`text-[10px] font-black px-3 py-1 rounded-full border transition-all ${lang === l ? 'bg-[#d4fd41] text-black border-[#d4fd41]' : 'text-gray-500 border-white/10'}`}>{l}</button>
           ))}
         </div>
 
+        {/* Header */}
         <header className="flex flex-col items-center mb-12 pt-10">
           <div className="flex flex-row-reverse items-center gap-4">
             <span className="text-6xl md:text-8xl font-black text-[#58339d]">ZAPIT</span>
@@ -138,17 +147,28 @@ export default function Home() {
           <p className="text-gray-500 mt-4 tracking-[0.3em] uppercase text-[10px] font-bold text-center">{t.slogan}</p>
         </header>
 
+        {/* Barre de recherche et filtres */}
         <div className="max-w-2xl mx-auto mb-16 space-y-4">
           <div className="flex p-1 bg-white/5 rounded-2xl border border-white/5">
             {['movie', 'tv'].map((k) => (
-              <button key={k} onClick={() => setType(k)} className={`flex-1 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all ${type === k ? 'bg-[#d4fd41] text-black' : 'text-gray-500'}`}>{t.categories[k]}</button>
+              <button key={k} onClick={() => {setType(k); setQuery('');}} className={`flex-1 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all ${type === k ? 'bg-[#d4fd41] text-black' : 'text-gray-500'}`}>{t.categories[k]}</button>
             ))}
           </div>
           <input type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t.placeholder} className="w-full bg-white/5 border-b-2 border-gray-800 p-6 text-center outline-none focus:border-[#d4fd41] text-xl font-bold rounded-3xl" />
         </div>
 
+        {/* Contenu principal */}
         {query ? (
-          <GridDisplay items={searchContent} title="Résultats de recherche" />
+          <>
+            <GridDisplay items={searchContent} title={t.sections.search} />
+            {searchContent.length >= 10 && (
+                <div className="flex justify-center mt-8 mb-12">
+                    <button onClick={() => fetchSearch(query, true)} className="bg-white/5 border border-white/10 px-10 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-[#d4fd41] hover:text-black transition-all">
+                        {t.more}
+                    </button>
+                </div>
+            )}
+          </>
         ) : (
           <>
             <GridDisplay items={localContent} title={t.sections.local} />
@@ -156,6 +176,7 @@ export default function Home() {
           </>
         )}
 
+        {/* Modal de détails */}
         <AnimatePresence>
           {selectedItem && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/95 backdrop-blur-xl" onClick={() => setSelectedItem(null)}>
@@ -164,6 +185,7 @@ export default function Home() {
                 <div className="w-full md:w-3/5 p-8 md:p-16 overflow-y-auto">
                   <h2 className="text-3xl md:text-5xl font-black mb-6 tracking-tighter">{selectedItem.title || selectedItem.name}</h2>
                   <p className="text-gray-400 text-lg mb-10 font-light italic">"{selectedItem.overview}"</p>
+                  
                   {providers && (
                     <div className="mb-10 bg-white/5 p-6 rounded-3xl border border-white/5">
                       <p className="text-[10px] font-black uppercase tracking-widest text-[#d4fd41] mb-5">{t.available}</p>
@@ -176,6 +198,7 @@ export default function Home() {
                       </div>
                     </div>
                   )}
+                  
                   <button onClick={() => setSelectedItem(null)} className="w-full bg-white text-black py-5 rounded-2xl font-black uppercase tracking-widest hover:bg-[#d4fd41] transition-all">{t.close}</button>
                 </div>
               </motion.div>
