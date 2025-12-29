@@ -33,17 +33,21 @@ export default function Home() {
   const [page, setPage] = useState(1);
   const [selectedItem, setSelectedItem] = useState(null);
   const [providers, setProviders] = useState(null);
+  const [showTopBtn, setShowTopBtn] = useState(false); // État pour le bouton "Haut"
 
   const t = translations[lang];
   const API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 
-  // Détection de la langue
   useEffect(() => {
     const browserLang = navigator.language.split('-')[0];
     if (['ar', 'fr', 'en'].includes(browserLang)) setLang(browserLang);
+
+    // Détecter le scroll pour le bouton "Haut"
+    const handleScroll = () => setShowTopBtn(window.scrollY > 400);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Chargement des données par défaut
   useEffect(() => {
     if (!query) {
         fetchLocalData();
@@ -51,7 +55,6 @@ export default function Home() {
     }
   }, [type, lang, query]);
 
-  // Debounce pour la recherche
   useEffect(() => {
     if (query) {
       const delay = setTimeout(() => fetchSearch(query), 600);
@@ -114,7 +117,12 @@ export default function Home() {
     return `https://www.google.com/search?q=${title}+watch+on+${encodeURIComponent(pName)}`;
   };
 
-  // Composant de Grille Réutilisable
+  const goHome = () => {
+    setQuery('');
+    setPage(1);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const GridDisplay = ({ items, title }) => (
     <div className="mb-12">
       <h3 className={`text-[#d4fd41] text-xs font-black uppercase tracking-[0.3em] mb-6 ${lang === 'ar' ? 'text-right' : 'text-left'}`}>
@@ -147,15 +155,15 @@ export default function Home() {
       <div className="max-w-7xl mx-auto relative">
         
         {/* Langues */}
-        <div className={`absolute top-0 ${lang === 'ar' ? 'left-0' : 'right-0'} flex gap-2 z-[110]`}>
+        <div className={`fixed top-6 ${lang === 'ar' ? 'left-6' : 'right-6'} flex gap-2 z-[110]`}>
           {['ar', 'fr', 'en'].map(l => (
-            <button key={l} onClick={() => setLang(l)} className={`text-[10px] font-black px-3 py-1 rounded-full border transition-all ${lang === l ? 'bg-[#d4fd41] text-black border-[#d4fd41]' : 'text-gray-500 border-white/10'}`}>{l}</button>
+            <button key={l} onClick={() => setLang(l)} className={`text-[10px] font-black px-3 py-1 rounded-full border transition-all ${lang === l ? 'bg-[#d4fd41] text-black border-[#d4fd41]' : 'text-gray-500 border-white/10 bg-black/50 backdrop-blur-md'}`}>{l}</button>
           ))}
         </div>
 
-        {/* Header */}
-        <header className="flex flex-col items-center mb-12 pt-10">
-          <div className="flex flex-row-reverse items-center gap-4">
+        {/* Header - Cliquable pour Home */}
+        <header className="flex flex-col items-center mb-12 pt-10 cursor-pointer group" onClick={goHome}>
+          <div className="flex flex-row-reverse items-center gap-4 transition-transform group-hover:scale-105">
             <span className="text-6xl md:text-8xl font-black text-[#58339d]">ZAPIT</span>
             <span className="text-gray-900 text-6xl md:text-8xl font-thin">|</span>
             <span className="text-6xl md:text-8xl font-black text-[#d4fd41]">زابط</span>
@@ -173,7 +181,7 @@ export default function Home() {
           <input type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t.placeholder} className="w-full bg-white/5 border-b-2 border-gray-800 p-6 text-center outline-none focus:border-[#d4fd41] text-xl font-bold rounded-3xl" />
         </div>
 
-        {/* Sections */}
+        {/* Contenu */}
         {query ? (
           <>
             <GridDisplay items={searchContent} title={t.sections.search} />
@@ -191,6 +199,21 @@ export default function Home() {
             <GridDisplay items={globalContent} title={t.sections.global} />
           </>
         )}
+
+        {/* Bouton Scroll to Top Flottant */}
+        <AnimatePresence>
+          {showTopBtn && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.5 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.5 }}
+              onClick={goHome}
+              className={`fixed bottom-8 ${lang === 'ar' ? 'left-8' : 'right-8'} z-[100] bg-[#d4fd41] text-black w-14 h-14 rounded-full shadow-2xl flex items-center justify-center text-2xl border-4 border-black font-black hover:scale-110 transition-transform`}
+            >
+              ↑
+            </motion.button>
+          )}
+        </AnimatePresence>
 
         {/* Modal de Détails */}
         <AnimatePresence>
