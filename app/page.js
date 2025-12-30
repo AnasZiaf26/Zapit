@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 const translations = {
   ar: {
     title: "زابط", slogan: "دليلك الشامل للبث المباشر", placeholder: "ابحث عن فيلم أو مسلسل...", 
-    sections: { local: "أكثر شيوعاً في قطر", global: "التوجهات العالمية", search: "نتائج البحث" },
+    sections: { local: "أكثر شيوعاً in قطر", global: "التوجهات العالمية", search: "نتائج البحث" },
     categories: { movie: "أفلام", tv: "مسلسلات" },
     available: "متوفر على :", close: "إغلاق", more: "عرض المزيد",
     noDesc: "لا يوجد وصف متاح حاليا لهذا الفيلم.",
@@ -108,7 +108,6 @@ export default function Home() {
     try {
       const res = await fetch(`https://api.themoviedb.org/3/${itemType}/${id}/watch/providers?api_key=${API_KEY}`);
       const data = await res.json();
-      // On priorise le Qatar, puis France/US si vide
       const regionData = data.results?.QA || data.results?.FR || data.results?.US;
       setProviders(regionData || null);
     } catch (e) { console.error(e); }
@@ -167,7 +166,7 @@ export default function Home() {
           ))}
         </div>
 
-        {/* Header - Home Button */}
+        {/* Header */}
         <header className="flex flex-col items-center mb-12 pt-10 cursor-pointer group" onClick={goHome}>
           <div className="flex flex-row-reverse items-center gap-4 transition-transform group-hover:scale-105">
             <span className="text-6xl md:text-8xl font-black text-[#58339d]">ZAPIT</span>
@@ -177,7 +176,7 @@ export default function Home() {
           <p className="text-gray-500 mt-4 tracking-[0.3em] uppercase text-[10px] font-bold text-center">{t.slogan}</p>
         </header>
 
-        {/* Barre de recherche */}
+        {/* Search */}
         <div className="max-w-2xl mx-auto mb-16 space-y-4">
           <div className="flex p-1 bg-white/5 rounded-2xl border border-white/5">
             {['movie', 'tv'].map((k) => (
@@ -187,7 +186,7 @@ export default function Home() {
           <input type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t.placeholder} className="w-full bg-white/5 border-b-2 border-gray-800 p-6 text-center outline-none focus:border-[#d4fd41] text-xl font-bold rounded-3xl" />
         </div>
 
-        {/* Sections de contenu */}
+        {/* Content */}
         {query ? (
           <>
             <GridDisplay items={searchContent} title={t.sections.search} />
@@ -206,7 +205,7 @@ export default function Home() {
           </>
         )}
 
-        {/* Bouton Scroll to Top */}
+        {/* Scroll Top Button */}
         <AnimatePresence>
           {showTopBtn && (
             <motion.button
@@ -221,12 +220,20 @@ export default function Home() {
           )}
         </AnimatePresence>
 
-        {/* Modal de Détails avec Correctifs */}
+        {/* Modal avec bouton X */}
         <AnimatePresence>
           {selectedItem && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/95 backdrop-blur-xl" onClick={() => setSelectedItem(null)}>
-              <motion.div initial={{ y: 50 }} className="bg-[#0c0c0d] border border-white/10 max-w-5xl w-full rounded-[3rem] overflow-hidden flex flex-col md:flex-row max-h-[90vh]" onClick={e => e.stopPropagation()}>
+              <motion.div initial={{ y: 50 }} className="bg-[#0c0c0d] border border-white/10 max-w-5xl w-full rounded-[3rem] overflow-hidden flex flex-col md:flex-row max-h-[90vh] relative" onClick={e => e.stopPropagation()}>
                 
+                {/* BOUTON X EN HAUT À DROITE */}
+                <button 
+                    onClick={() => setSelectedItem(null)}
+                    className="absolute top-6 right-6 z-[210] bg-black/50 hover:bg-white/10 text-white w-10 h-10 rounded-full flex items-center justify-center border border-white/10 transition-colors text-xl font-light"
+                >
+                    ✕
+                </button>
+
                 <div className="w-full md:w-2/5 h-64 md:h-auto">
                     <img src={`https://image.tmdb.org/t/p/w500${selectedItem.poster_path}`} className="w-full h-full object-cover" alt="" />
                 </div>
@@ -239,12 +246,10 @@ export default function Home() {
                     <span className="text-gray-500 text-sm">{(selectedItem.release_date || selectedItem.first_air_date || '').split('-')[0]}</span>
                   </div>
 
-                  {/* FIX: Description de secours si vide */}
                   <p className="text-gray-400 text-lg mb-10 font-light italic">
                     {selectedItem.overview ? `"${selectedItem.overview}"` : t.noDesc}
                   </p>
                   
-                  {/* FIX: Gestion Cinéma vs Plateformes */}
                   <div className="mb-10 bg-white/5 p-6 rounded-3xl border border-white/5">
                     <p className="text-[10px] font-black uppercase tracking-widest text-[#d4fd41] mb-5">{t.available}</p>
                     
