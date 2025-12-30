@@ -122,8 +122,15 @@ export default function Home() {
     try {
       const res = await fetch(`https://api.themoviedb.org/3/discover/${type}?api_key=${API_KEY}&language=${tmdbLang}&sort_by=popularity.desc&with_genres=${genreId}&page=${nextPage}&watch_region=${userRegion}`);
       const data = await res.json();
-      if (isMore) { setGenreContent(prev => [...prev, ...data.results]); setGenrePage(nextPage); }
-      else { setGenreContent(data.results); setGenrePage(1); window.scrollTo({ top: 500, behavior: 'smooth' }); }
+      if (isMore) { 
+        setGenreContent(prev => [...prev, ...data.results]); 
+        setGenrePage(nextPage); 
+      }
+      else { 
+        setGenreContent(data.results); 
+        setGenrePage(1); 
+        window.scrollTo({ top: 500, behavior: 'smooth' }); 
+      }
     } catch (e) { console.error(e); }
   };
 
@@ -166,6 +173,9 @@ export default function Home() {
             <h4 className={`text-sm font-bold truncate px-2 ${lang === 'ar' ? 'text-right' : 'text-left'}`}>
               {m.title || m.name}
             </h4>
+            <p className={`text-[10px] text-gray-500 px-2 mt-1 ${lang === 'ar' ? 'text-right' : 'text-left'}`}>
+              {(m.release_date || m.first_air_date || '').split('-')[0]}
+            </p>
           </motion.div>
         ))}
       </div>
@@ -231,6 +241,11 @@ export default function Home() {
                 <div className="w-full md:w-2/5 h-64 md:h-auto"><img src={`https://image.tmdb.org/t/p/w500${selectedItem.poster_path}`} className="w-full h-full object-cover" alt="" /></div>
                 <div className="w-full md:w-3/5 p-8 md:p-16 overflow-y-auto">
                   <h2 className="text-3xl md:text-5xl font-black mb-2">{selectedItem.title || selectedItem.name}</h2>
+                  <div className="flex items-center gap-2 mb-6 text-sm">
+                    <span className="text-[#d4fd41] font-bold">★ {selectedItem.vote_average?.toFixed(1)}</span>
+                    <span className="text-gray-600">|</span>
+                    <span className="text-gray-400">{(selectedItem.release_date || selectedItem.first_air_date || '').split('-')[0]}</span>
+                  </div>
                   <p className="text-gray-400 text-lg mb-10 font-light">{selectedItem.overview || t.noDesc}</p>
                   <div className="mb-10 bg-white/5 p-6 rounded-3xl border border-white/5">
                     <p className="text-[10px] font-black uppercase text-[#d4fd41] mb-5">{t.available}</p>
