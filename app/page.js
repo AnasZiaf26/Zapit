@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 const translations = {
   ar: {
     title: "زابط", slogan: "دليلك الشامل للبث المباشر", placeholder: "ابحث عن فيلم أو مسلسل...", 
-    sections: { local: "أكثر شيوعاً in قطر", global: "التوجهات العالمية", search: "نتائج البحث" },
+    sections: { local: "أكثر شيوعاً في قطر 🇶🇦", global: "التوجهات العالمية", search: "نتائج البحث" },
     categories: { movie: "أفلام", tv: "مسلسلات" },
     available: "متوفر على :", close: "إغلاق", more: "عرض المزيد",
     noDesc: "لا يوجد وصف متاح حاليا لهذا الفيلم.",
@@ -13,7 +13,7 @@ const translations = {
   },
   fr: {
     title: "ZAPIT", slogan: "Votre guide ultime du streaming", placeholder: "Chercher un film, une série...", 
-    sections: { local: "Top au Qatar", global: "Tendances Mondiales", search: "Résultats de recherche" },
+    sections: { local: "Top au Qatar 🇶🇦", global: "Tendances Mondiales", search: "Résultats de recherche" },
     categories: { movie: "Films", tv: "Séries" },
     available: "Disponible sur :", close: "Fermer", more: "Voir plus",
     noDesc: "Aucune description disponible pour le moment.",
@@ -21,7 +21,7 @@ const translations = {
   },
   en: {
     title: "ZAPIT", slogan: "Your ultimate streaming guide", placeholder: "Search movies, shows...", 
-    sections: { local: "Trending in Qatar", global: "Global Trends", search: "Search Results" },
+    sections: { local: "Trending in Qatar 🇶🇦", global: "Global Trends", search: "Search Results" },
     categories: { movie: "Movies", tv: "TV Shows" },
     available: "Watch on:", close: "Close", more: "See more",
     noDesc: "No description available at the moment.",
@@ -40,13 +40,21 @@ export default function Home() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [providers, setProviders] = useState(null);
   const [showTopBtn, setShowTopBtn] = useState(false);
+  const [userRegion, setUserRegion] = useState('QA'); // Par défaut Qatar
 
   const t = translations[lang];
   const API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 
   useEffect(() => {
+    // Détection de la langue
     const browserLang = navigator.language.split('-')[0];
     if (['ar', 'fr', 'en'].includes(browserLang)) setLang(browserLang);
+
+    // Détection basique de la zone (si Doha, on force QA)
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (tz.includes('Qatar') || tz.includes('Doha')) {
+        setUserRegion('QA');
+    }
 
     const handleScroll = () => setShowTopBtn(window.scrollY > 400);
     window.addEventListener('scroll', handleScroll);
@@ -58,7 +66,7 @@ export default function Home() {
         fetchLocalData();
         fetchGlobalData();
     }
-  }, [type, lang, query]);
+  }, [type, lang, query, userRegion]);
 
   useEffect(() => {
     if (query) {
@@ -70,7 +78,8 @@ export default function Home() {
   const fetchLocalData = async () => {
     const tmdbLang = lang === 'ar' ? 'ar-SA' : lang === 'fr' ? 'fr-FR' : 'en-US';
     try {
-      const res = await fetch(`https://api.themoviedb.org/3/discover/${type}?api_key=${API_KEY}&language=${tmdbLang}&sort_by=popularity.desc&watch_region=QA&with_watch_monetization_types=flatrate`);
+      // On filtre par la région détectée (QA par défaut)
+      const res = await fetch(`https://api.themoviedb.org/3/discover/${type}?api_key=${API_KEY}&language=${tmdbLang}&sort_by=popularity.desc&watch_region=${userRegion}&with_watch_monetization_types=flatrate`);
       const data = await res.json();
       setLocalContent(data.results?.slice(0, 6) || []);
     } catch (e) { console.error(e); }
@@ -108,7 +117,8 @@ export default function Home() {
     try {
       const res = await fetch(`https://api.themoviedb.org/3/${itemType}/${id}/watch/providers?api_key=${API_KEY}`);
       const data = await res.json();
-      const regionData = data.results?.QA || data.results?.FR || data.results?.US;
+      // On priorise le Qatar dans les résultats
+      const regionData = data.results?.[userRegion] || data.results?.US || data.results?.FR;
       setProviders(regionData || null);
     } catch (e) { console.error(e); }
   };
@@ -205,28 +215,12 @@ export default function Home() {
           </>
         )}
 
-        {/* Scroll Top Button */}
-        <AnimatePresence>
-          {showTopBtn && (
-            <motion.button
-              initial={{ opacity: 0, scale: 0.5 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.5 }}
-              onClick={goHome}
-              className={`fixed bottom-8 ${lang === 'ar' ? 'left-8' : 'right-8'} z-[100] bg-[#d4fd41] text-black w-14 h-14 rounded-full shadow-2xl flex items-center justify-center text-2xl border-4 border-black font-black hover:scale-110 transition-transform`}
-            >
-              ↑
-            </motion.button>
-          )}
-        </AnimatePresence>
-
-        {/* Modal avec bouton X */}
+        {/* Modal et reste du code identique... */}
         <AnimatePresence>
           {selectedItem && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/95 backdrop-blur-xl" onClick={() => setSelectedItem(null)}>
               <motion.div initial={{ y: 50 }} className="bg-[#0c0c0d] border border-white/10 max-w-5xl w-full rounded-[3rem] overflow-hidden flex flex-col md:flex-row max-h-[90vh] relative" onClick={e => e.stopPropagation()}>
                 
-                {/* BOUTON X EN HAUT À DROITE */}
                 <button 
                     onClick={() => setSelectedItem(null)}
                     className="absolute top-6 right-6 z-[210] bg-black/50 hover:bg-white/10 text-white w-10 h-10 rounded-full flex items-center justify-center border border-white/10 transition-colors text-xl font-light"
