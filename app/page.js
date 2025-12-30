@@ -1,109 +1,283 @@
-import React from 'react';
-import { headers } from 'next/headers';
+"use client";
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 
-// --- CONFIGURATION API (Remplace par ta clé TMDB) ---
-const API_KEY = 'VOTRE_CLE_TMDB_ICI';
-const BASE_URL = 'https://api.themoviedb.org/3';
+const translations = {
+  ar: {
+    title: "زابط", slogan: "دليلك الشامل للبث المباشر", placeholder: "ابحث عن فيلم أو مسلسل...", 
+    sections: { local: "أكثر شيوعاً in قطر", global: "التوجهات العالمية", search: "نتائج البحث" },
+    categories: { movie: "أفلام", tv: "مسلسلات" },
+    available: "متوفر على :", close: "إغلاق", more: "عرض المزيد",
+    noDesc: "لا يوجد وصف متاح حاليا لهذا الفيلم.",
+    cinemaOnly: "يعرض حالياً في دور السينما فقط"
+  },
+  fr: {
+    title: "ZAPIT", slogan: "Votre guide ultime du streaming", placeholder: "Chercher un film, une série...", 
+    sections: { local: "Top au Qatar", global: "Tendances Mondiales", search: "Résultats de recherche" },
+    categories: { movie: "Films", tv: "Séries" },
+    available: "Disponible sur :", close: "Fermer", more: "Voir plus",
+    noDesc: "Aucune description disponible pour le moment.",
+    cinemaOnly: "Actuellement au cinéma uniquement"
+  },
+  en: {
+    title: "ZAPIT", slogan: "Your ultimate streaming guide", placeholder: "Search movies, shows...", 
+    sections: { local: "Trending in Qatar", global: "Global Trends", search: "Search Results" },
+    categories: { movie: "Movies", tv: "TV Shows" },
+    available: "Watch on:", close: "Close", more: "See more",
+    noDesc: "No description available at the moment.",
+    cinemaOnly: "Currently in theaters only"
+  }
+};
 
-async function getData(countryCode) {
-  // On récupère les films tendances spécifiquement pour la région
-  const res = await fetch(
-    `${BASE_URL}/trending/movie/day?api_key=${API_KEY}&region=${countryCode}`,
-    { next: { revalidate: 3600 } } // Cache d'une heure pour la performance
+export default function Home() {
+  const [lang, setLang] = useState('ar'); 
+  const [localContent, setLocalContent] = useState([]);
+  const [globalContent, setGlobalContent] = useState([]);
+  const [searchContent, setSearchContent] = useState([]);
+  const [query, setQuery] = useState('');
+  const [type, setType] = useState('movie'); 
+  const [page, setPage] = useState(1);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [providers, setProviders] = useState(null);
+  const [showTopBtn, setShowTopBtn] = useState(false);
+
+  const t = translations[lang];
+  const API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+
+  useEffect(() => {
+    const browserLang = navigator.language.split('-')[0];
+    if (['ar', 'fr', 'en'].includes(browserLang)) setLang(browserLang);
+
+    const handleScroll = () => setShowTopBtn(window.scrollY > 400);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  useEffect(() => {
+    if (!query) {
+        fetchLocalData();
+        fetchGlobalData();
+    }
+  }, [type, lang, query]);
+
+  useEffect(() => {
+    if (query) {
+      const delay = setTimeout(() => fetchSearch(query), 600);
+      return () => clearTimeout(delay);
+    }
+  }, [query]);
+
+  const fetchLocalData = async () => {
+    const tmdbLang = lang === 'ar' ? 'ar-SA' : lang === 'fr' ? 'fr-FR' : 'en-US';
+    try {
+      const res = await fetch(`https://api.themoviedb.org/3/discover/${type}?api_key=${API_KEY}&language=${tmdbLang}&sort_by=popularity.desc&watch_region=QA&with_watch_monetization_types=flatrate`);
+      const data = await res.json();
+      setLocalContent(data.results?.slice(0, 6) || []);
+    } catch (e) { console.error(e); }
+  };
+
+  const fetchGlobalData = async () => {
+    const tmdbLang = lang === 'ar' ? 'ar-SA' : lang === 'fr' ? 'fr-FR' : 'en-US';
+    try {
+      const res = await fetch(`https://api.themoviedb.org/3/trending/${type}/week?api_key=${API_KEY}&language=${tmdbLang}`);
+      const data = await res.json();
+      setGlobalContent(data.results?.slice(0, 12) || []);
+    } catch (e) { console.error(e); }
+  };
+
+  const fetchSearch = async (q, isMore = false) => {
+    const tmdbLang = lang === 'ar' ? 'ar-SA' : 'fr-FR';
+    const nextPage = isMore ? page + 1 : 1;
+    try {
+      const res = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=${API_KEY}&language=${tmdbLang}&query=${q}&page=${nextPage}`);
+      const data = await res.json();
+      const newItems = data.results?.filter(i => i.poster_path) || [];
+      
+      if (isMore) {
+        setSearchContent(prev => [...prev, ...newItems]);
+        setPage(nextPage);
+      } else {
+        setSearchContent(newItems);
+        setPage(1);
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const fetchProviders = async (id, itemType) => {
+    setProviders(null);
+    try {
+      const res = await fetch(`https://api.themoviedb.org/3/${itemType}/${id}/watch/providers?api_key=${API_KEY}`);
+      const data = await res.json();
+      const regionData = data.results?.QA || data.results?.FR || data.results?.US;
+      setProviders(regionData || null);
+    } catch (e) { console.error(e); }
+  };
+
+  const getDirectLink = (pName, mTitle) => {
+    const title = encodeURIComponent(mTitle);
+    const name = pName.toLowerCase();
+    if (name.includes('netflix')) return `https://www.netflix.com/search?q=${title}`;
+    if (name.includes('prime')) return `https://www.primevideo.com/search/?phrase=${title}`;
+    if (name.includes('apple')) return `https://tv.apple.com/search?term=${title}`;
+    return `https://www.google.com/search?q=${title}+watch+on+${encodeURIComponent(pName)}`;
+  };
+
+  const goHome = () => {
+    setQuery('');
+    setPage(1);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const GridDisplay = ({ items, title }) => (
+    <div className="mb-12">
+      <h3 className={`text-[#d4fd41] text-xs font-black uppercase tracking-[0.3em] mb-6 ${lang === 'ar' ? 'text-right' : 'text-left'}`}>
+        {title}
+      </h3>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-x-6 gap-y-10">
+        {items.map((m, idx) => (
+          <motion.div key={`${m.id}-${idx}`} whileHover={{ y: -8 }} onClick={() => {setSelectedItem(m); fetchProviders(m.id, m.media_type || type)}} className="group cursor-pointer">
+            <div className="relative aspect-[2/3] rounded-[2rem] overflow-hidden bg-white/5 border border-white/5 mb-3">
+              <img src={`https://image.tmdb.org/t/p/w500${m.poster_path}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt="" />
+              <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg flex items-center gap-1 border border-white/10">
+                <span className="text-[#d4fd41] text-[10px] font-bold">★</span>
+                <span className="text-white text-[10px] font-black">{m.vote_average?.toFixed(1)}</span>
+              </div>
+            </div>
+            <h4 className={`text-sm font-bold truncate px-2 ${lang === 'ar' ? 'text-right' : 'text-left'}`}>
+              {m.title || m.name}
+            </h4>
+            <p className={`text-[10px] text-gray-500 px-2 mt-1 ${lang === 'ar' ? 'text-right' : 'text-left'}`}>
+              {(m.release_date || m.first_air_date || '').split('-')[0]}
+            </p>
+          </motion.div>
+        ))}
+      </div>
+    </div>
   );
-  if (!res.ok) return null;
-  return res.json();
-}
-
-export default async function ZapitHomePage() {
-  // 1. Détection de la localisation via Vercel Edge Headers
-  const headerList = headers();
-  const countryCode = headerList.get('x-vercel-ip-country') || 'QA';
-  
-  // Personnalisation du titre selon le pays
-  const displayCountry = countryCode === 'QA' ? 'Qatar 🇶🇦' : countryCode;
-  
-  const data = await getData(countryCode);
-  const movies = data?.results?.slice(0, 12) || [];
 
   return (
-    <div className="min-h-screen bg-black text-white font-sans">
-      {/* --- BARRE DE NAVIGATION --- */}
-      <nav className="border-b border-zinc-800 p-4 flex justify-between items-center bg-black/50 backdrop-blur-md sticky top-0 z-50">
-        <div className="text-2xl font-black tracking-tighter italic" style={{ color: '#d4fd41' }}>
-          ZAPIT <span className="text-white ml-1 text-sm not-italic font-light">| زابط</span>
-        </div>
-        <div className="flex gap-4 items-center">
-            <span className="text-xs bg-zinc-900 px-2 py-1 rounded text-zinc-400">
-                Region: {countryCode}
-            </span>
-        </div>
-      </nav>
-
-      {/* --- SECTION HERO --- */}
-      <header className="py-16 px-6 text-center bg-gradient-to-b from-zinc-900/50 to-black">
-        <h1 className="text-4xl md:text-6xl font-bold mb-4 tracking-tight">
-            Don't search. <span style={{ color: '#d4fd41' }}>Watch.</span>
-        </h1>
-        <p className="text-zinc-400 text-lg max-w-xl mx-auto">
-            Find exactly where to stream any movie in <span className="text-white font-semibold">{displayCountry}</span>.
-        </p>
+    <main className="min-h-screen bg-[#050505] text-white p-6 md:p-12" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+      <div className="max-w-7xl mx-auto relative">
         
-        {/* BARRE DE RECHERCHE NÉON */}
-        <div className="mt-8 max-w-2xl mx-auto relative">
-          <input 
-            type="text" 
-            placeholder="Search movie or series..." 
-            className="w-full bg-zinc-900 border-2 border-zinc-800 p-4 rounded-full px-8 focus:outline-none focus:border-[#d4fd41] transition-all text-lg shadow-[0_0_15px_rgba(0,0,0,0.5)]"
-            style={{ caretColor: '#d4fd41' }}
-          />
-          <button className="absolute right-3 top-2 bottom-2 px-6 rounded-full font-bold text-black" style={{ backgroundColor: '#d4fd41' }}>
-            Search
-          </button>
-        </div>
-      </header>
-
-      {/* --- SECTION TENDANCES LOCALES --- */}
-      <section className="max-w-7xl mx-auto px-6 py-12">
-        <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl font-bold">Trending in {displayCountry}</h2>
-            <div className="h-1 flex-1 mx-4 bg-zinc-900 rounded-full overflow-hidden">
-                <div className="h-full w-24 rounded-full" style={{ backgroundColor: '#d4fd41' }}></div>
-            </div>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6">
-          {movies.map((movie) => (
-            <div key={movie.id} className="group cursor-pointer">
-              <div className="relative aspect-[2/3] rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800 group-hover:border-[#d4fd41] transition-all">
-                <img 
-                  src={`https://image.tmdb.org/t/p/w500${movie.poster_path}`} 
-                  alt={movie.title}
-                  className="object-cover w-full h-full opacity-80 group-hover:opacity-100 transition-opacity"
-                />
-                <div className="absolute top-2 right-2 bg-black/80 backdrop-blur-sm text-[10px] font-bold px-2 py-1 rounded border border-white/10 text-[#d4fd41]">
-                    {movie.vote_average.toFixed(1)}
-                </div>
-              </div>
-              <h3 className="mt-3 text-sm font-medium leading-tight group-hover:text-[#d4fd41] transition-colors line-clamp-2">
-                {movie.title}
-              </h3>
-              <p className="text-xs text-zinc-500 mt-1">
-                {new Date(movie.release_date).getFullYear()}
-              </p>
-            </div>
+        {/* Langues */}
+        <div className={`fixed top-6 ${lang === 'ar' ? 'left-6' : 'right-6'} flex gap-2 z-[110]`}>
+          {['ar', 'fr', 'en'].map(l => (
+            <button key={l} onClick={() => setLang(l)} className={`text-[10px] font-black px-3 py-1 rounded-full border transition-all ${lang === l ? 'bg-[#d4fd41] text-black border-[#d4fd41]' : 'text-gray-500 border-white/10 bg-black/50 backdrop-blur-md'}`}>{l}</button>
           ))}
         </div>
-      </section>
 
-      {/* --- FOOTER --- */}
-      <footer className="border-t border-zinc-900 py-12 px-6 text-center mt-20">
-        <div className="text-[#d4fd41] font-bold mb-4">ZAPIT</div>
-        <p className="text-zinc-600 text-xs">
-            Made for cinema lovers in Doha. <br/>
-            © 2025 Zapit Media Group.
-        </p>
-      </footer>
-    </div>
+        {/* Header */}
+        <header className="flex flex-col items-center mb-12 pt-10 cursor-pointer group" onClick={goHome}>
+          <div className="flex flex-row-reverse items-center gap-4 transition-transform group-hover:scale-105">
+            <span className="text-6xl md:text-8xl font-black text-[#58339d]">ZAPIT</span>
+            <span className="text-gray-900 text-6xl md:text-8xl font-thin">|</span>
+            <span className="text-6xl md:text-8xl font-black text-[#d4fd41]">زابط</span>
+          </div>
+          <p className="text-gray-500 mt-4 tracking-[0.3em] uppercase text-[10px] font-bold text-center">{t.slogan}</p>
+        </header>
+
+        {/* Search */}
+        <div className="max-w-2xl mx-auto mb-16 space-y-4">
+          <div className="flex p-1 bg-white/5 rounded-2xl border border-white/5">
+            {['movie', 'tv'].map((k) => (
+              <button key={k} onClick={() => {setType(k); setQuery('');}} className={`flex-1 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all ${type === k ? 'bg-[#d4fd41] text-black' : 'text-gray-500'}`}>{t.categories[k]}</button>
+            ))}
+          </div>
+          <input type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t.placeholder} className="w-full bg-white/5 border-b-2 border-gray-800 p-6 text-center outline-none focus:border-[#d4fd41] text-xl font-bold rounded-3xl" />
+        </div>
+
+        {/* Content */}
+        {query ? (
+          <>
+            <GridDisplay items={searchContent} title={t.sections.search} />
+            {searchContent.length >= 10 && (
+                <div className="flex justify-center mt-8 mb-12">
+                    <button onClick={() => fetchSearch(query, true)} className="bg-white/5 border border-white/10 px-10 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-[#d4fd41] hover:text-black transition-all">
+                        {t.more}
+                    </button>
+                </div>
+            )}
+          </>
+        ) : (
+          <>
+            <GridDisplay items={localContent} title={t.sections.local} />
+            <GridDisplay items={globalContent} title={t.sections.global} />
+          </>
+        )}
+
+        {/* Scroll Top Button */}
+        <AnimatePresence>
+          {showTopBtn && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.5 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.5 }}
+              onClick={goHome}
+              className={`fixed bottom-8 ${lang === 'ar' ? 'left-8' : 'right-8'} z-[100] bg-[#d4fd41] text-black w-14 h-14 rounded-full shadow-2xl flex items-center justify-center text-2xl border-4 border-black font-black hover:scale-110 transition-transform`}
+            >
+              ↑
+            </motion.button>
+          )}
+        </AnimatePresence>
+
+        {/* Modal avec bouton X */}
+        <AnimatePresence>
+          {selectedItem && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/95 backdrop-blur-xl" onClick={() => setSelectedItem(null)}>
+              <motion.div initial={{ y: 50 }} className="bg-[#0c0c0d] border border-white/10 max-w-5xl w-full rounded-[3rem] overflow-hidden flex flex-col md:flex-row max-h-[90vh] relative" onClick={e => e.stopPropagation()}>
+                
+                {/* BOUTON X EN HAUT À DROITE */}
+                <button 
+                    onClick={() => setSelectedItem(null)}
+                    className="absolute top-6 right-6 z-[210] bg-black/50 hover:bg-white/10 text-white w-10 h-10 rounded-full flex items-center justify-center border border-white/10 transition-colors text-xl font-light"
+                >
+                    ✕
+                </button>
+
+                <div className="w-full md:w-2/5 h-64 md:h-auto">
+                    <img src={`https://image.tmdb.org/t/p/w500${selectedItem.poster_path}`} className="w-full h-full object-cover" alt="" />
+                </div>
+
+                <div className="w-full md:w-3/5 p-8 md:p-16 overflow-y-auto">
+                  <h2 className="text-3xl md:text-5xl font-black mb-2 tracking-tighter">{selectedItem.title || selectedItem.name}</h2>
+                  <div className="flex items-center gap-2 mb-6">
+                    <span className="text-[#d4fd41] font-bold">★ {selectedItem.vote_average?.toFixed(1)}</span>
+                    <span className="text-gray-600">|</span>
+                    <span className="text-gray-500 text-sm">{(selectedItem.release_date || selectedItem.first_air_date || '').split('-')[0]}</span>
+                  </div>
+
+                  <p className="text-gray-400 text-lg mb-10 font-light italic">
+                    {selectedItem.overview ? `"${selectedItem.overview}"` : t.noDesc}
+                  </p>
+                  
+                  <div className="mb-10 bg-white/5 p-6 rounded-3xl border border-white/5">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-[#d4fd41] mb-5">{t.available}</p>
+                    
+                    {providers && providers.flatrate && providers.flatrate.length > 0 ? (
+                      <div className="flex flex-wrap gap-4">
+                        {providers.flatrate.map(p => (
+                          <a key={p.provider_id} href={getDirectLink(p.provider_name, selectedItem.title || selectedItem.name)} target="_blank" rel="noopener noreferrer" className="hover:scale-110 transition-transform">
+                            <img src={`https://image.tmdb.org/t/p/original${p.logo_path}`} className="w-14 h-14 rounded-2xl border border-white/10" alt={p.provider_name} />
+                          </a>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-3 text-gray-400 bg-white/5 p-4 rounded-2xl border border-dashed border-white/10">
+                        <span className="text-xl">🍿</span>
+                        <p className="text-[10px] font-black uppercase tracking-widest">{t.cinemaOnly}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <button onClick={() => setSelectedItem(null)} className="w-full bg-white text-black py-5 rounded-2xl font-black uppercase tracking-widest hover:bg-[#d4fd41] transition-all">
+                    {t.close}
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </main>
   );
 }
