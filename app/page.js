@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 const translations = {
   ar: {
     title: "زابط", slogan: "دليلك الشامل للبث المباشر", placeholder: "ابحث عن فيلم أو مسلسل...", 
-    sections: { local: "أكثر شيوعاً في قطر 🇶🇦", global: "التوجهات العالمية", search: "نتائج البحث", genre: "أفضل الأفلام", netflix: "أفضل ما في Netflix", disney: "أفضل ما في Disney+", prime: "أفضل ما في Prime Video" },
+    sections: { local: "أكثر شيوعاً في قطر 🇶🇦", global: "التوجهات العالمية", search: "نتائج البحث", genre: "أفضل الأفلام", netflix: "أفضل ما في Netflix", cinema: "يعرض حالياً في السينما", prime: "أفضل ما في Prime Video" },
     categories: { movie: "أفلام", tv: "مسلسلات" },
     available: "متوفر على :", close: "إغلاق", more: "عرض المزيد",
     noDesc: "لا يوجد وصف متاح حاليا لهذا الفيلم.",
@@ -13,7 +13,7 @@ const translations = {
   },
   fr: {
     title: "ZAPIT", slogan: "Votre guide ultime du streaming", placeholder: "Chercher un film, une série...", 
-    sections: { local: "Top au Qatar 🇶🇦", global: "Tendances Mondiales", search: "Résultats de recherche", genre: "Les meilleurs films", netflix: "Le Top Netflix", disney: "Le Top Disney+", prime: "Le Top Prime Video" },
+    sections: { local: "Top au Qatar 🇶🇦", global: "Tendances Mondiales", search: "Résultats de recherche", genre: "Les meilleurs films", netflix: "Le Top Netflix", cinema: "Actuellement au Cinéma", prime: "Le Top Prime Video" },
     categories: { movie: "Films", tv: "Séries" },
     available: "Disponible sur :", close: "Fermer", more: "Voir plus",
     noDesc: "Aucune description disponible pour le moment.",
@@ -21,7 +21,7 @@ const translations = {
   },
   en: {
     title: "ZAPIT", slogan: "Your ultimate streaming guide", placeholder: "Search movies, shows...", 
-    sections: { local: "Trending in Qatar 🇶🇦", global: "Global Trends", search: "Search Results", genre: "Top Movies", netflix: "Best of Netflix", disney: "Best of Disney+", prime: "Best of Prime Video" },
+    sections: { local: "Trending in Qatar 🇶🇦", global: "Global Trends", search: "Search Results", genre: "Top Movies", netflix: "Best of Netflix", cinema: "In Theaters Now", prime: "Best of Prime Video" },
     categories: { movie: "Movies", tv: "TV Shows" },
     available: "Watch on:", close: "Close", more: "See more",
     noDesc: "No description available at the moment.",
@@ -40,7 +40,7 @@ export default function Home() {
   const [localContent, setLocalContent] = useState([]);
   const [globalContent, setGlobalContent] = useState([]);
   const [netflixContent, setNetflixContent] = useState([]);
-  const [disneyContent, setDisneyContent] = useState([]);
+  const [cinemaContent, setCinemaContent] = useState([]); // Changement ici
   const [primeContent, setPrimeContent] = useState([]);
   const [searchContent, setSearchContent] = useState([]);
   const [genreContent, setGenreContent] = useState([]);
@@ -73,7 +73,7 @@ export default function Home() {
         fetchLocalData();
         fetchGlobalData();
         fetchProviderData(8, setNetflixContent);    // Netflix
-        fetchProviderData(337, setDisneyContent);  // Disney+
+        fetchCinemaData();                          // Cinéma
         fetchProviderData(119, setPrimeContent);   // Amazon Prime
     }
   }, [type, lang, query, userRegion, selectedGenre]);
@@ -92,6 +92,16 @@ export default function Home() {
       const res = await fetch(`https://api.themoviedb.org/3/discover/${type}?api_key=${API_KEY}&language=${tmdbLang}&sort_by=popularity.desc&watch_region=${userRegion}&with_watch_providers=${providerId}&with_watch_monetization_types=flatrate`);
       const data = await res.json();
       setter(data.results?.slice(0, 6) || []);
+    } catch (e) { console.error(e); }
+  };
+
+  const fetchCinemaData = async () => {
+    const tmdbLang = lang === 'ar' ? 'ar-SA' : lang === 'fr' ? 'fr-FR' : 'en-US';
+    try {
+      // Pour le cinéma, on utilise l'endpoint now_playing ou discover avec date
+      const res = await fetch(`https://api.themoviedb.org/3/movie/now_playing?api_key=${API_KEY}&language=${tmdbLang}&page=1&region=${userRegion}`);
+      const data = await res.json();
+      setCinemaContent(data.results?.slice(0, 6) || []);
     } catch (e) { console.error(e); }
   };
 
@@ -229,23 +239,26 @@ export default function Home() {
             <GridDisplay items={localContent} title={t.sections.local} />
             <GridDisplay items={globalContent} title={t.sections.global} />
             
-            {/* Nouvelles Sections Plateformes */}
             <GridDisplay items={netflixContent} title={t.sections.netflix} color="#E50914" />
-            <GridDisplay items={disneyContent} title={t.sections.disney} color="#0063e5" />
+            
+            {/* Section Cinéma (Remplace Disney+) */}
+            {type === 'movie' && (
+              <GridDisplay items={cinemaContent} title={t.sections.cinema} color="#ffffff" />
+            )}
+            
             <GridDisplay items={primeContent} title={t.sections.prime} color="#00a8e1" />
           </>
         )}
 
-        {/* Le reste de ton composant (Modal AnimatePresence et Scroll button) reste inchangé */}
         <AnimatePresence>
           {selectedItem && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/95 backdrop-blur-xl" onClick={() => setSelectedItem(null)}>
               <motion.div initial={{ y: 50 }} className="bg-[#0c0c0d] border border-white/10 max-w-5xl w-full rounded-[3rem] overflow-hidden flex flex-col md:flex-row max-h-[90vh] relative" onClick={e => e.stopPropagation()}>
                 <button onClick={() => setSelectedItem(null)} className="absolute top-6 right-6 z-[210] bg-black/50 text-white w-10 h-10 rounded-full flex items-center justify-center border border-white/10">✕</button>
                 <div className="w-full md:w-2/5 h-64 md:h-auto"><img src={`https://image.tmdb.org/t/p/w500${selectedItem.poster_path}`} className="w-full h-full object-cover" alt="" /></div>
-                <div className="w-full md:w-3/5 p-8 md:p-16 overflow-y-auto text-right">
+                <div className="w-full md:w-3/5 p-8 md:p-16 overflow-y-auto">
                   <h2 className="text-3xl md:text-5xl font-black mb-2">{selectedItem.title || selectedItem.name}</h2>
-                  <div className="flex items-center gap-2 mb-6 text-sm justify-end">
+                  <div className="flex items-center gap-2 mb-6 text-sm">
                     <span className="text-[#d4fd41] font-bold">★ {selectedItem.vote_average?.toFixed(1)}</span>
                     <span className="text-gray-600">|</span>
                     <span className="text-gray-400">{(selectedItem.release_date || selectedItem.first_air_date || '').split('-')[0]}</span>
@@ -254,7 +267,7 @@ export default function Home() {
                   <div className="mb-10 bg-white/5 p-6 rounded-3xl border border-white/5">
                     <p className="text-[10px] font-black uppercase text-[#d4fd41] mb-5">{t.available}</p>
                     {providers?.flatrate ? (
-                      <div className="flex flex-wrap gap-4 justify-end">
+                      <div className="flex flex-wrap gap-4">
                         {providers.flatrate.map(p => (
                           <a key={p.provider_id} href={getDirectLink(p.provider_name, selectedItem.title || selectedItem.name)} target="_blank" rel="noopener noreferrer" className="hover:scale-110 transition-transform"><img src={`https://image.tmdb.org/t/p/original${p.logo_path}`} className="w-14 h-14 rounded-2xl border border-white/10" alt="" /></a>
                         ))}
